@@ -1,0 +1,93 @@
+blueprint:
+  name: Control light from Ikea on/off switch through deCONZ
+  description:  "Control a light with your on/off switch from Ikea through deCONZ."
+  domain: automation
+  input:
+    dim_rate:
+        name: "Dim rate"
+        description: "Sets the the dim rate. Higher value means faster movement"
+        default: 10
+        selector:
+          number:
+            min: 1
+            max: 100
+            unit_of_measurement: "%/second"
+    remote:
+      name: Remote
+      description: The remote used
+      selector:
+        device:
+          integration: deconz
+          manufacturer: 'IKEA of Sweden'
+          model: 'TRADFRI on/off switch'
+    light:
+      name: Light
+      description: The lights that will be controlled
+      selector:
+        target:
+          entity:
+            domain: light
+
+mode: restart
+
+trigger:
+- platform: event
+  event_type: deconz_event
+  event_data:
+    device_id: !input 'remote'
+
+action:
+- variables:
+    event: "{{ trigger.event.data.event }}"
+    dim_rate: !input 'dim_rate'
+    light: !input 'light'
+
+- choose:
+  - conditions:
+    - "{{ event == 1002 }}"
+    sequence:
+    - service: light.turn_on
+      target: !input 'light'
+      data:
+        transition: 1
+  - conditions:
+    - "{{ event == 2002 }}"
+    sequence:
+    - service: light.turn_off
+      target: !input 'light'
+      data:
+        transition: 1
+  - conditions:
+    - "{{ event == 1001 }}"
+    sequence:
+      repeat:
+        count: 100
+        sequence:
+        - service: light.turn_on
+          target: !input 'light'
+          data:
+            transition: 1
+            brightness_step_pct: '{{ dim_rate }}'
+        - delay: 1
+  - conditions:
+    - "{{ event == 2001 }}"
+    sequence:
+      repeat:
+        count: 100
+        sequence:
+        - service: light.turn_on
+          target: !input 'light'
+          data:
+            transition: 1
+            brightness_step_pct: "{{0-(dim_rate)}}"
+        - delay: 1
+  - conditions:
+    - "{{ event == 1003 }}"
+    sequence:
+    - service: light.turn_on
+      target: !input 'light'
+  - conditions:
+    - "{{ event == 2003 }}"
+    sequence:
+    - service: light.turn_on
+      target: !input 'light'
